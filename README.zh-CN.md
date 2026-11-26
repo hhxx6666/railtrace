@@ -4,6 +4,8 @@
 
 [English](README.md) · MIT 许可证 · Node.js 22+
 
+![失败的 capture：红线是实测的 RESET_N 释放时刻，琥珀虚线是允许的最早释放时刻](docs/screenshot.png)
+
 ## 运行样例
 
 在仓库根目录运行，无需安装第三方依赖。

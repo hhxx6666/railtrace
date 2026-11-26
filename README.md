@@ -4,6 +4,8 @@ Run power-sequencing regression tests on CSV waveforms from an oscilloscope or a
 
 [简体中文](README.zh-CN.md) · MIT license · Node.js 22+
 
+![The failing capture: the red line is the observed RESET_N release, the amber dashed line is the earliest allowed release](docs/screenshot.png)
+
 ## Try the examples
 
 Run this from the repository root. RailTrace has no runtime dependencies.
