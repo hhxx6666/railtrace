@@ -1,0 +1,12 @@
+{
+  "csv": { "timeColumn": "Time (ms)", "timeUnit": "ms" },
+  "signals": [
+    { "id": "VIN_5V", "column": "VIN_5V", "thresholdV": 4.5, "holdMs": 0.15 },
+    { "id": "VDD_1V8", "column": "VDD_1V8", "thresholdV": 1.62, "holdMs": 0.15 },
+    { "id": "RESET_N", "column": "RESET_N", "thresholdV": 1.2, "holdMs": 0.15 }
+  ],
+  "rules": [
+    { "id": "Power rail order", "kind": "order", "from": "VIN_5V", "to": "VDD_1V8" },
+    { "id": "Reset release window", "kind": "delay", "from": "VDD_1V8", "to": "RESET_N", "minMs": 1, "maxMs": 3 }
+  ]
+}

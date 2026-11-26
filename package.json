@@ -1,0 +1,10 @@
+{
+  "name": "railtrace",
+  "version": "0.1.0",
+  "description": "Power sequencing regression tests for oscilloscope and simulation CSVs",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "railtrace": "./bin/railtrace.mjs" },
+  "scripts": { "test": "node --test" },
+  "license": "MIT"
+}

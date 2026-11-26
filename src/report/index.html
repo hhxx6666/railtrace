@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RailTrace · Power sequencing report</title>
+  <!-- STYLE -->
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell masthead-inner">
+      <span class="brand"><span class="brand-icon" aria-hidden="true">↗</span>RailTrace</span>
+      <span class="masthead-label">POWER SEQUENCING</span>
+    </div>
+  </header>
+  <main class="shell">
+    <header class="intro">
+      <div>
+        <h1>Regression report</h1>
+        <p id="summary"></p>
+      </div>
+      <label class="capture-picker">Capture<select id="capture"></select></label>
+    </header>
+    <section class="panel scope" aria-labelledby="scope-title">
+      <header class="panel-header">
+        <div>
+          <h2 id="scope-title">Waveforms</h2>
+          <p id="capture-meta"></p>
+        </div>
+        <div class="toolbar" aria-label="Waveform zoom">
+          <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+          <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+          <button type="button" id="fit">Fit</button>
+        </div>
+      </header>
+      <div class="plot"><canvas id="chart" role="img" aria-labelledby="scope-title" aria-describedby="selection legend"></canvas></div>
+      <div class="legend" id="legend">
+        <span><i class="event-key"></i>Qualified edge</span>
+        <span><i class="fail-key"></i>Failed edge or capture end</span>
+        <span><i class="limit-key"></i>Timing limit</span>
+        <span><i class="threshold-key"></i>Voltage threshold</span>
+      </div>
+      <p class="selection" id="selection" aria-live="polite"></p>
+    </section>
+    <section class="panel rule-panel" aria-labelledby="rule-title">
+      <header class="panel-header">
+        <div><h2 id="rule-title">Timing rules</h2><p>Select a rule to locate its events on the waveforms.</p></div>
+        <strong class="count" id="rule-count"></strong>
+      </header>
+      <ul class="rules" id="rules"></ul>
+    </section>
+    <details class="panel signals">
+      <summary>Signal measurements</summary>
+      <div class="measurements">
+        <table>
+          <thead><tr><th scope="col">Signal</th><th scope="col">Edge</th><th scope="col">Threshold</th><th scope="col">Hold</th><th scope="col">Event</th></tr></thead>
+          <tbody id="signals"></tbody>
+        </table>
+      </div>
+    </details>
+  </main>
+  <!-- DATA -->
+  <!-- SCRIPT -->
+</body>
+</html>
