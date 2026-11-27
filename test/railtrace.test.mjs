@@ -112,8 +112,9 @@ test('a 100 ms gap cannot establish a 5 ms hold or an earlier qualifying edge', 
   ] }, settings);
   assert.equal(earlyGap.signals[0].eventMs, null);
   assert.equal(earlyGap.rules[0].reason, 'sample_gap');
-  assert.throws(() => readConfig(fixture('sequence.json').replace('"csv": {', '"csv": {"maxSampleGapMs": 0,')),
-    /maxSampleGapMs.*> 0/);
+  const invalid = JSON.parse(fixture('sequence.json'));
+  invalid.csv.maxSampleGapMs = 0;
+  assert.throws(() => readConfig(JSON.stringify(invalid)), /maxSampleGapMs.*> 0/);
 });
 
 test('serializes executable-looking labels only as report data', () => {

@@ -22,7 +22,7 @@ node bin/railtrace.mjs --config examples/sequence.json --html report.html --json
 
 | 配置项 | 含义 |
 | --- | --- |
-| `csv` | `timeColumn` 对应时间列名，`timeUnit` 支持 `s`、`ms`、`us` 和 `ns`。可用 `delimiter` 指定逗号、分号或制表符，默认逗号。用 `skipRows` 跳过表头之前的记录，用 `skipDataRows` 跳过紧接表头的单位等记录。 |
+| `csv` | `timeColumn` 对应时间列名，`timeUnit` 支持 `s`、`ms`、`us` 和 `ns`。可用 `maxSampleGapMs` 设置最大采样间隔，随附的示例使用 0.5 ms。可用 `delimiter` 指定逗号、分号或制表符，默认逗号。用 `skipRows` 跳过表头之前的记录，用 `skipDataRows` 跳过紧接表头的单位等记录。 |
 | `signals` | `id` 是规则引用的信号名，`column` 对应电压列。用 `thresholdV` 指定电压阈值。用 `edge` 指定上升沿 `rising`（默认）或下降沿 `falling`。用 `holdMs` 指定边沿跨过阈值后需保持的毫秒数，默认 0。常见的低有效 `RESET_N` 用上升沿检测释放。 |
 | `rules` | `id` 是报告里的规则名。`from` 指定参考信号，`to` 指定目标信号。`order` 要求参考边沿严格早于目标边沿。`delay` 要求两者的时间差落在 `minMs` 与可选的 `maxMs` 之间，包含边界。 |
 

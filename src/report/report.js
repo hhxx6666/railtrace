@@ -20,6 +20,7 @@ let selected;
 let domain;
 let marks = [];
 let ranges = [];
+let gapStarts = new Set();
 
 function node(tag, className, value) {
   const item = document.createElement(tag);
@@ -107,8 +108,9 @@ function draw() {
   }
   label('ms', left - 10, bottom + 17, '#b6d0d3', 'right');
 
-  const gapStarts = new Set(run.sampleGaps.map(gap => gap.nextSample));
   for (const gap of run.sampleGaps) {
+    if (gap.endMs <= domain[0]) continue;
+    if (gap.startMs >= domain[1]) break;
     const x1 = Math.max(left, locateX(gap.startMs));
     const x2 = Math.min(right, locateX(gap.endMs));
     if (x2 <= x1) continue;
@@ -219,6 +221,7 @@ function selectRule(index, focus) {
 
 function loadCapture(index) {
   run = runs[index];
+  gapStarts = new Set(run.sampleGaps.map(gap => gap.nextSample));
   ranges = run.voltages.map((values, i) => {
     let min = run.signals[i].thresholdV;
     let max = min;
@@ -243,7 +246,7 @@ function loadCapture(index) {
     const arrow = node('span', 'arrow', '›');
     arrow.setAttribute('aria-hidden', 'true');
     button.append(
-      node('span', 'badge ' + rule.status, rule.status === 'insufficient_evidence' ? 'INSUFFICIENT' : rule.status.toUpperCase()),
+      node('span', 'badge ' + rule.status, rule.status === 'insufficient_evidence' ? 'GAP' : rule.status.toUpperCase()),
       description,
       node('span', 'rule-detail', rule.detail),
       arrow,

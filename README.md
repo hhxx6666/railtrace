@@ -22,7 +22,7 @@ Copy [examples/sequence.json](examples/sequence.json) and edit the column names,
 
 | Section | Fields |
 | --- | --- |
-| `csv` | `timeColumn` names the timestamp header. `timeUnit` is `s`, `ms`, `us`, or `ns`. Optional `delimiter` is a comma (default), semicolon, or tab (`"\t"` in JSON). Optional `skipRows` skips records before the header and `skipDataRows` skips records immediately after it. |
+| `csv` | `timeColumn` names the timestamp header. `timeUnit` is `s`, `ms`, `us`, or `ns`. Optional `maxSampleGapMs` bounds the interval between samples. Optional `delimiter` is a comma (default), semicolon, or tab (`"\t"` in JSON). Optional `skipRows` skips records before the header and `skipDataRows` skips records immediately after it. |
 | Each signal | `id` is the name used by rules. `column` names the voltage column. Set `thresholdV` in volts. Optional `edge` is `rising` (default) or `falling`. Optional `holdMs` defaults to 0. Rising detects release of a conventional active-low `RESET_N`. |
 | Each rule | `id` labels the rule. `from` is the reference signal and `to` is the measured signal. An `order` rule requires `from` to occur strictly before `to`. A `delay` rule checks `to − from` against inclusive `minMs` and optional `maxMs`. |
 
@@ -32,7 +32,7 @@ RailTrace linearly interpolates each threshold crossing between samples. The eve
 
 ## Run in CI
 
-Set the optional `csv.maxSampleGapMs` to the largest allowed interval between adjacent samples, in milliseconds regardless of the CSV time unit. The limit is inclusive. An edge and its full hold must be verified before the first longer gap because an earlier qualifying edge could be hidden in that gap. For example, samples at 0, 1 and 101 ms with a 5 ms hold and `maxSampleGapMs: 5` leave the hold unresolved. The report breaks the waveform at the gap and marks affected rules as `insufficient_evidence`. Choose the limit based on the shortest edge or glitch the capture needs to resolve.
+Set the optional `csv.maxSampleGapMs` to the largest allowed interval between adjacent samples, in milliseconds regardless of the CSV time unit. The included example uses 0.5 ms. The limit is inclusive. An edge and its full hold must be verified before the first longer gap because an earlier qualifying edge could be hidden in that gap. For example, samples at 0, 1 and 101 ms with a 5 ms hold and `maxSampleGapMs: 5` leave the hold unresolved. The report breaks the waveform at the gap and marks affected rules as `insufficient_evidence`. Choose the limit based on the shortest edge or glitch the capture needs to resolve.
 
 Each invocation uses one configuration for all its input captures. Pass `--json` for structured results and `--html` for an interactive artifact. The report paths are optional and their parent directories must exist.
 
