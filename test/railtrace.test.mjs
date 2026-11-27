@@ -86,6 +86,36 @@ test('checks strict order, both inclusive delay bounds, and missing edges', () =
   assert.deepEqual(check([0, 0, 0, 0, 0])[0].missing, ['reset']);
 });
 
+test('a 100 ms gap cannot establish a 5 ms hold or an earlier qualifying edge', () => {
+  const settings = {
+    csv: { maxSampleGapMs: 5 },
+    signals: [
+      { id: 'power', thresholdV: 1, edge: 'rising', holdMs: 5 },
+      { id: 'reset', thresholdV: 1, edge: 'rising', holdMs: 0 },
+    ],
+    rules: [{ id: 'sequence', kind: 'order', from: 'reset', to: 'power' }],
+  };
+  const reference = analyze('gap.csv', { timeMs: [0, 1, 101], voltages: [[0, 2, 2], [0, 2, 2]] }, settings);
+  assert.equal(reference.signals[0].eventMs, null);
+  assert.equal(reference.signals[1].eventMs, 0.5);
+  assert.equal(reference.rules[0].status, 'insufficient_evidence');
+  assert.deepEqual(reference.rules[0].gap, { startMs: 1, endMs: 101, nextSample: 2 });
+  assert.equal(reference.failures, 0);
+  assert.equal(reference.insufficient, 1);
+
+  const within = analyze('limit.csv', { timeMs: [0, 1, 6, 106], voltages: [[0, 1, 2, 2], [0, 2, 2, 2]] }, settings);
+  assert.equal(within.signals[0].eventMs, 1);
+  assert.equal(within.rules[0].status, 'pass');
+
+  const earlyGap = analyze('hidden.csv', { timeMs: [0, 100, 101, 105, 106], voltages: [
+    [0, 0, 2, 2, 2], [0, 0, 2, 2, 2],
+  ] }, settings);
+  assert.equal(earlyGap.signals[0].eventMs, null);
+  assert.equal(earlyGap.rules[0].reason, 'sample_gap');
+  assert.throws(() => readConfig(fixture('sequence.json').replace('"csv": {', '"csv": {"maxSampleGapMs": 0,')),
+    /maxSampleGapMs.*> 0/);
+});
+
 test('serializes executable-looking labels only as report data', () => {
   const capture = readCapture(fixture('fail.csv'), config);
   const name = '</script><script>alert(1)</script>';
@@ -117,6 +147,20 @@ test('CLI emits reports for failed rules, with distinct exit codes for pass and 
     assert.equal(results.captures[0].failures, 0);
     assert.deepEqual(results.captures[1].rules.map(rule => rule.reason), ['out_of_order', 'too_early']);
     assert.match(readFileSync(html, 'utf8'), /Timing limit/);
+
+    const gapConfig = join(output, 'gap-config.json');
+    const gapCapture = join(output, 'gap.csv');
+    const settings = JSON.parse(fixture('sequence.json'));
+    settings.csv.maxSampleGapMs = 5;
+    settings.signals[1].holdMs = 5;
+    writeFileSync(gapConfig, JSON.stringify(settings));
+    writeFileSync(gapCapture, 'Time (ms),VIN_5V,VDD_1V8,RESET_N\n0,0,0,0\n1,5,1.8,0\n101,5,1.8,3.3\n');
+    const gap = spawnSync(process.execPath, [cli, '--config', gapConfig, '--json', json, '--html', html, gapCapture],
+      { cwd: root, encoding: 'utf8' });
+    assert.equal(gap.status, 1, gap.stderr);
+    assert.match(gap.stdout, /INSUFFICIENT EVIDENCE gap.csv/);
+    assert.equal(JSON.parse(readFileSync(json, 'utf8')).captures[0].insufficient, 2);
+    assert.match(readFileSync(html, 'utf8'), /Insufficient evidence.*sample gap 1 ms to 101 ms/);
 
     const invalid = join(output, 'broken.csv');
     const noReport = join(output, 'invalid.html');

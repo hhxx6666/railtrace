@@ -11,7 +11,7 @@ const help = `RailTrace — power sequencing regression tests
 
 Usage: railtrace --config rules.json [--html report.html] [--json report.json] <capture.csv> [...]
 
-Exit codes: 0 all rules passed, 1 timing check failed, 2 input or execution error.
+Exit codes: 0 all rules passed, 1 failed rule or insufficient evidence, 2 input or execution error.
 Use -- before positional filenames that start with a dash.`;
 
 function parseArgs(args) {
@@ -89,14 +89,16 @@ function main(args) {
     usedPaths.add(identity);
   }
   const captures = runs.map(run => run.result);
-  const passed = captures.every(capture => capture.failures === 0);
+  const passed = captures.every(capture => !capture.failures && !capture.insufficient);
   if (options.html) save(options.html, renderReport(runs));
   if (options.json) save(options.json, JSON.stringify({ schemaVersion: 1, passed, captures }, null, 2) + '\n');
 
   for (const capture of captures) {
-    console.log(`${capture.failures ? 'FAIL' : 'PASS'} ${capture.file} · ${capture.rules.length - capture.failures}/${capture.rules.length} rules passed`);
+    const verdict = capture.failures ? 'FAIL' : capture.insufficient ? 'INSUFFICIENT EVIDENCE' : 'PASS';
+    const passedRules = capture.rules.length - capture.failures - capture.insufficient;
+    console.log(`${verdict} ${capture.file} · ${passedRules}/${capture.rules.length} rules passed`);
     for (const rule of capture.rules) {
-      if (rule.status === 'fail') console.log(`  ${rule.id}: ${describe(rule)}`);
+      if (rule.status !== 'pass') console.log(`  ${rule.id}: ${describe(rule)}`);
     }
   }
   return passed ? 0 : 1;

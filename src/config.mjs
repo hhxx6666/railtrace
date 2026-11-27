@@ -36,10 +36,13 @@ function list(value, path) {
 
 export function readConfig(source) {
   const config = object(JSON.parse(source.replace(/^\uFEFF/, '')), ['csv', 'signals', 'rules'], 'config');
-  const csv = object(config.csv, ['timeColumn', 'timeUnit', 'delimiter', 'skipRows', 'skipDataRows'], 'csv');
-  const { timeUnit, delimiter = ',', skipRows = 0, skipDataRows = 0 } = csv;
+  const csv = object(config.csv, ['timeColumn', 'timeUnit', 'delimiter', 'skipRows', 'skipDataRows', 'maxSampleGapMs'], 'csv');
+  const { timeUnit, delimiter = ',', skipRows = 0, skipDataRows = 0, maxSampleGapMs } = csv;
   if (!timeFactors.has(timeUnit)) throw new Error('csv.timeUnit must be s, ms, us, or ns');
   if (!delimiters.has(delimiter)) throw new Error('csv.delimiter must be a comma, semicolon, or tab');
+  if (maxSampleGapMs !== undefined && (!Number.isFinite(maxSampleGapMs) || maxSampleGapMs <= 0)) {
+    throw new Error('csv.maxSampleGapMs must be a finite number > 0');
+  }
 
   const signalIds = new Set();
   const signals = list(config.signals, 'signals').map((item, i) => {
@@ -85,6 +88,7 @@ export function readConfig(source) {
       delimiter,
       skipRows: count(skipRows, 'csv.skipRows'),
       skipDataRows: count(skipDataRows, 'csv.skipDataRows'),
+      ...(maxSampleGapMs === undefined ? {} : { maxSampleGapMs }),
     },
     signals,
     rules,
