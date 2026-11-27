@@ -59,6 +59,8 @@ canvas { display: block; width: 100%; }
 .rule:focus-visible { outline-offset: -3px; }
 .badge { justify-self: start; padding: 3px 6px; border-radius: 4px; color: var(--teal); background: #deefe7; font: 700 11px var(--mono); }
 .badge.fail { color: var(--red); background: #f9e6ec; }
+.badge.insufficient_evidence { color: #785200; background: #fff0cc; }
+.legend i.gap-key { border: 0; height: 7px; background: #d4ae6b; }
 .rule-name, .rule-route { display: block; overflow-wrap: anywhere; }
 .rule-name { font-size: 13px; font-weight: 700; }
 .rule-route, .rule-detail { font: 12px/1.4 var(--mono); color: var(--muted); overflow-wrap: anywhere; }

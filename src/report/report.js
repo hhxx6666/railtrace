@@ -20,6 +20,7 @@ let selected;
 let domain;
 let marks = [];
 let ranges = [];
+let gapStarts = new Set();
 
 function node(tag, className, value) {
   const item = document.createElement(tag);
@@ -55,7 +56,7 @@ function label(value, x, y, color = '#b6d0d3', align = 'left', maxWidth = undefi
   ctx.fillText(value, x, y, maxWidth);
 }
 
-function waveform(times, volts, locateX, locateY, left, right) {
+function waveform(times, volts, gapStarts, locateX, locateY, left, right) {
   const first = Math.max(0, lowerBound(times, domain[0]) - 1);
   const last = Math.min(times.length - 1, lowerBound(times, domain[1]));
   let start = first;
@@ -66,11 +67,12 @@ function waveform(times, volts, locateX, locateY, left, right) {
     let end = start;
     let min = start;
     let max = start;
-    while (end < last && Math.floor(locateX(times[end + 1])) === pixel) {
+    while (end < last && !gapStarts.has(end + 1) && Math.floor(locateX(times[end + 1])) === pixel) {
       end++;
       if (volts[end] < volts[min]) min = end;
       if (volts[end] > volts[max]) max = end;
     }
+    if (gapStarts.has(start)) ctx.moveTo(locateX(times[start]), locateY(volts[start]));
     for (const i of [start, Math.min(min, max), Math.max(min, max), end]) {
       ctx.lineTo(locateX(times[i]), locateY(volts[i]));
     }
@@ -106,6 +108,16 @@ function draw() {
   }
   label('ms', left - 10, bottom + 17, '#b6d0d3', 'right');
 
+  for (const gap of run.sampleGaps) {
+    if (gap.endMs <= domain[0]) continue;
+    if (gap.startMs >= domain[1]) break;
+    const x1 = Math.max(left, locateX(gap.startMs));
+    const x2 = Math.min(right, locateX(gap.endMs));
+    if (x2 <= x1) continue;
+    ctx.fillStyle = 'rgba(240, 192, 110, .14)';
+    ctx.fillRect(x1, 17, x2 - x1, bottom - 17);
+  }
+
   run.signals.forEach((signal, i) => {
     const color = palette[i % palette.length];
     const top = 17 + i * laneHeight;
@@ -128,7 +140,7 @@ function draw() {
     line(left, thresholdY, right, thresholdY, '#81999e', [3, 4]);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.7;
-    waveform(run.timeMs, run.voltages[i], locateX, locateY, left, right);
+    waveform(run.timeMs, run.voltages[i], gapStarts, locateX, locateY, left, right);
     if (signal.eventMs !== null) {
       const edgeX = locateX(signal.eventMs);
       ctx.fillStyle = color;
@@ -180,6 +192,7 @@ function selectRule(index, focus) {
     ...(rule.toMs === null ? [] : [{ time: rule.toMs, color: failed ? failColor : observed, pattern: [] }]),
     ...(rule.limitMs === undefined ? [] : [{ time: rule.limitMs, color: limitColor, pattern: [5, 4] }]),
     ...(rule.missing ? [{ time: run.endMs, color: failColor, pattern: [2, 4] }] : []),
+    ...(rule.gap ? [rule.gap.startMs, rule.gap.endMs].map(time => ({ time, color: limitColor, pattern: [2, 4] })) : []),
   ];
   const times = marks.filter(mark => mark.time >= run.startMs && mark.time <= run.endMs).map(mark => mark.time);
   const locations = [
@@ -191,6 +204,7 @@ function selectRule(index, focus) {
     locations.push('Limit ' + ms(rule.limitMs) + (outside ? ' (outside capture)' : ''));
   }
   if (rule.missing) locations.push('Capture end ' + ms(run.endMs));
+  if (rule.gap) locations.push('Sample gap ' + ms(rule.gap.startMs) + ' to ' + ms(rule.gap.endMs));
   selection.textContent = rule.id + ' · ' + locations.join(' · ');
   for (const [i, li] of [...rulesList.children].entries()) {
     li.firstElementChild.setAttribute('aria-pressed', String(i === selected));
@@ -207,6 +221,7 @@ function selectRule(index, focus) {
 
 function loadCapture(index) {
   run = runs[index];
+  gapStarts = new Set(run.sampleGaps.map(gap => gap.nextSample));
   ranges = run.voltages.map((values, i) => {
     let min = run.signals[i].thresholdV;
     let max = min;
@@ -219,8 +234,9 @@ function loadCapture(index) {
   document.querySelector('#capture-meta').textContent =
     run.signals.length + ' signals · ' + run.samples.toLocaleString('en') + ' samples · ' + ms(run.endMs - run.startMs);
   const count = document.querySelector('#rule-count');
-  count.textContent = (run.rules.length - run.failures) + ' passed · ' + run.failures + ' failed';
-  count.classList.toggle('has-failures', run.failures > 0);
+  count.textContent = (run.rules.length - run.failures - run.insufficient) + ' passed · ' +
+    run.failures + ' failed · ' + run.insufficient + ' insufficient evidence';
+  count.classList.toggle('has-failures', run.failures > 0 || run.insufficient > 0);
   rulesList.replaceChildren(...run.rules.map((rule, i) => {
     const item = node('li', '', '');
     const button = node('button', 'rule', '');
@@ -230,7 +246,7 @@ function loadCapture(index) {
     const arrow = node('span', 'arrow', '›');
     arrow.setAttribute('aria-hidden', 'true');
     button.append(
-      node('span', 'badge ' + rule.status, rule.status.toUpperCase()),
+      node('span', 'badge ' + rule.status, rule.status === 'insufficient_evidence' ? 'GAP' : rule.status.toUpperCase()),
       description,
       node('span', 'rule-detail', rule.detail),
       arrow,
@@ -241,22 +257,25 @@ function loadCapture(index) {
   }));
   document.querySelector('#signals').replaceChildren(...run.signals.map(signal => {
     const row = document.createElement('tr');
-    const values = [signal.id, signal.edge, shortNumber(signal.thresholdV) + ' V', ms(signal.holdMs), ms(signal.eventMs)];
+    const values = [signal.id, signal.edge, shortNumber(signal.thresholdV) + ' V', ms(signal.holdMs),
+      signal.evidenceGap ? 'Insufficient evidence' : ms(signal.eventMs)];
     row.append(...values.map(value => node('td', '', value)));
     return row;
   }));
-  selectRule(Math.max(0, run.rules.findIndex(rule => rule.status === 'fail')), false);
+  selectRule(Math.max(0, run.rules.findIndex(rule => rule.status !== 'pass')), false);
 }
 
 const failingRuns = runs.filter(candidate => candidate.failures > 0).length;
+const insufficientRuns = runs.filter(candidate => candidate.insufficient > 0).length;
 document.querySelector('#summary').textContent =
-  runs.length + ' capture' + (runs.length === 1 ? '' : 's') + ' analyzed · ' + failingRuns + ' with failed rules';
+  runs.length + ' capture' + (runs.length === 1 ? '' : 's') + ' analyzed · ' + failingRuns + ' with failed rules · ' +
+  insufficientRuns + ' with insufficient evidence';
 runs.forEach((candidate, i) => {
   const option = node('option', '', candidate.file);
   option.value = i;
   capturePicker.append(option);
 });
-capturePicker.value = Math.max(0, runs.findIndex(candidate => candidate.failures > 0));
+capturePicker.value = Math.max(0, runs.findIndex(candidate => candidate.failures > 0 || candidate.insufficient > 0));
 capturePicker.addEventListener('change', () => loadCapture(Number(capturePicker.value)));
 const zoom = factor => {
   const span = domain[1] - domain[0];

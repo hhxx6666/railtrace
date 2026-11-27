@@ -1,5 +1,5 @@
 {
-  "csv": { "timeColumn": "Time (ms)", "timeUnit": "ms" },
+  "csv": { "timeColumn": "Time (ms)", "timeUnit": "ms", "maxSampleGapMs": 0.5 },
   "signals": [
     { "id": "VIN_5V", "column": "VIN_5V", "thresholdV": 4.5, "holdMs": 0.15 },
     { "id": "VDD_1V8", "column": "VDD_1V8", "thresholdV": 1.62, "holdMs": 0.15 },

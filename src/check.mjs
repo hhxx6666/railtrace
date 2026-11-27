@@ -10,11 +10,11 @@ function crossingTime(t0, t1, v0, v1, threshold) {
   return t0 + (t1 - t0) * fraction;
 }
 
-export function findEdge(timeMs, values, { edge, thresholdV, holdMs }) {
+export function findEdge(timeMs, values, { edge, thresholdV, holdMs }, evidenceEnd = timeMs.length) {
   const active = edge === 'rising' ? value => value >= thresholdV : value => value <= thresholdV;
   let started = null;
   let previousActive = active(values[0]);
-  for (let i = 1; i < timeMs.length; i++) {
+  for (let i = 1; i < evidenceEnd; i++) {
     const currentActive = active(values[i]);
     if (currentActive !== previousActive) {
       const crossing = crossingTime(timeMs[i - 1], timeMs[i], values[i - 1], values[i], thresholdV);
@@ -32,14 +32,25 @@ export function findEdge(timeMs, values, { edge, thresholdV, holdMs }) {
 }
 
 function checkRule(rule, edges) {
-  const fromMs = edges.get(rule.from);
-  const toMs = edges.get(rule.to);
+  const from = edges.get(rule.from);
+  const to = edges.get(rule.to);
+  const fromMs = from.eventMs;
+  const toMs = to.eventMs;
   const result = { ...rule, fromMs, toMs, deltaMs: null, status: 'fail' };
+  if (from.evidenceGap || to.evidenceGap) {
+    return {
+      ...result,
+      status: 'insufficient_evidence',
+      reason: 'sample_gap',
+      gap: from.evidenceGap ?? to.evidenceGap,
+      unconfirmed: [from, to].filter(signal => signal.evidenceGap).map(signal => signal.id),
+    };
+  }
   if (fromMs === null || toMs === null) {
     return {
       ...result,
       reason: 'missing_edge',
-      missing: [rule.from, rule.to].filter(id => edges.get(id) === null),
+      missing: [from, to].filter(signal => signal.eventMs === null).map(signal => signal.id),
     };
   }
 
@@ -57,14 +68,29 @@ function checkRule(rule, edges) {
 
 export function analyze(file, capture, config) {
   const { timeMs, voltages } = capture;
-  const signals = config.signals.map((signal, index) => ({
-    ...signal,
-    eventMs: findEdge(timeMs, voltages[index], signal),
-  }));
-  const edges = new Map(signals.map(signal => [signal.id, signal.eventMs]));
+  const maxSampleGapMs = config.csv?.maxSampleGapMs;
+  const sampleGaps = [];
+  if (maxSampleGapMs !== undefined) {
+    for (let i = 1; i < timeMs.length; i++) {
+      const startMs = timeMs[i - 1];
+      const endMs = timeMs[i];
+      if (endMs - startMs > maxSampleGapMs + timeTolerance(startMs, endMs)) {
+        sampleGaps.push({ startMs, endMs, nextSample: i });
+      }
+    }
+  }
+  // A gap can hide an earlier qualifying edge, even with equal values at its endpoints.
+  const firstGap = sampleGaps[0];
+  const signals = config.signals.map((signal, index) => {
+    const eventMs = findEdge(timeMs, voltages[index], signal, firstGap?.nextSample);
+    return { ...signal, eventMs, ...(eventMs === null && firstGap ? { evidenceGap: firstGap } : {}) };
+  });
+  const edges = new Map(signals.map(signal => [signal.id, signal]));
   const rules = config.rules.map(rule => checkRule(rule, edges));
   const failures = rules.filter(rule => rule.status === 'fail').length;
-  return { file, samples: timeMs.length, startMs: timeMs[0], endMs: timeMs.at(-1), signals, rules, failures };
+  const insufficient = rules.filter(rule => rule.status === 'insufficient_evidence').length;
+  return { file, samples: timeMs.length, startMs: timeMs[0], endMs: timeMs.at(-1), maxSampleGapMs,
+    sampleGaps, signals, rules, failures, insufficient };
 }
 
 export function formatMs(value) {
@@ -72,6 +98,9 @@ export function formatMs(value) {
 }
 
 export function describe(rule) {
+  if (rule.reason === 'sample_gap') {
+    return `Insufficient evidence for ${rule.unconfirmed.join(', ')}: sample gap ${formatMs(rule.gap.startMs)} to ${formatMs(rule.gap.endMs)}`;
+  }
   if (rule.reason === 'missing_edge') return `No qualifying edge for ${rule.missing.join(', ')}`;
   if (rule.reason === 'out_of_order') return `${rule.to} must follow ${rule.from} (Δ ${formatMs(rule.deltaMs)})`;
   if (rule.reason === 'too_early') return `Δ ${formatMs(rule.deltaMs)} is below ${formatMs(rule.minMs)}`;
